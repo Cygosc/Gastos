@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos Mensuales</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: #e2e0d8;
+  --border2: #ccc9be;
+  --text: #1a1917;
+  --text2: #6b6860;
+  --text3: #a09e98;
+  --green: #2d6a4f;
+  --green-bg: #e8f5ee;
+  --blue: #1a4a8a;
+  --blue-bg: #e8eef8;
+  --amber: #7a4a00;
+  --amber-bg: #fef3e2;
+  --red: #8a1a1a;
+  --red-bg: #fde8e8;
+  --purple: #4a1a8a;
+  --purple-bg: #ede8f8;
+  --accent: #2d6a4f;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 3rem;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+}
+.logo {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.month-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.sync-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #bbb;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.sync-dot.ok { background: #2d6a4f; }
+.sync-dot.saving { background: #d4860a; }
+.sync-dot.err { background: #8a1a1a; }
+
+/* ── MAIN ── */
+.main { max-width: 720px; margin: 0 auto; padding: 1.25rem; }
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 1.25rem;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.tab {
+  flex: 1;
+  min-width: fit-content;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--text2);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 1rem;
+}
+
+/* ── FORM ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; color: var(--text2); }
+input, select {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+input[type=color] { width: 44px; padding: 2px 4px; cursor: pointer; }
+input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+
+.btn {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover { background: var(--surface2); }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+.btn.primary:hover { opacity: 0.85; background: var(--text); }
+.btn.green { border-color: var(--green); color: var(--green); }
+.btn.green:hover { background: var(--green-bg); }
+.btn.danger { border-color: transparent; color: var(--red); }
+.btn.danger:hover { background: var(--red-bg); }
+.btn.sm { height: 30px; padding: 0 10px; font-size: 12px; }
+
+/* ── MONTH BAR ── */
+.month-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.month-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.month-select-wrap select { flex: 1; min-width: 0; font-weight: 500; }
+
+/* ── EXPENSE ITEMS ── */
+.exp-list { margin-top: 0.5rem; }
+.exp-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 1rem 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rec-indicator {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.exp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 5px;
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+.exp-item:hover { border-color: var(--border2); }
+.exp-item.rec { border-left: 3px solid var(--green); background: var(--green-bg); }
+.badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  font-family: 'DM Mono', monospace;
+}
+.badge.rec { background: var(--green-bg); color: var(--green); }
+.badge.cat { background: var(--surface2); color: var(--text2); }
+.exp-name { flex: 1; font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exp-person { font-size: 11px; white-space: nowrap; }
+.exp-amount { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; min-width: 80px; text-align: right; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
+.exp-amount:hover { background: var(--surface2); }
+.amount-edit { width: 90px; text-align: right; height: 30px; font-size: 13px; font-family: 'DM Mono', monospace; }
+
+/* ── METRICS ── */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+}
+.metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+.metric-value { font-size: 20px; font-weight: 600; font-family: 'DM Mono', monospace; }
+.metric-value.green { color: var(--green); }
+.metric-value.blue { color: var(--blue); }
+.metric-value.amber { color: var(--amber); }
+.metric-value.red { color: var(--red); }
+.metric-value.purple { color: var(--purple); }
+
+/* ── CHARTS ── */
+.chart-row { margin-bottom: 10px; }
+.chart-lbl { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--text2); }
+.chart-lbl span:last-child { font-family: 'DM Mono', monospace; font-size: 11px; }
+.chart-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+.chart-fill { height: 8px; border-radius: 4px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
+
+/* ── DIVISION ── */
+.div-mode-wrap { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.div-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 8px; }
+.div-card-head { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.div-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; color: var(--text2); }
+.div-row span:last-child { font-family: 'DM Mono', monospace; }
+.div-total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--border); font-family: 'DM Mono', monospace; }
+
+/* ── HISTORIAL ── */
+.hist-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; margin-bottom: 8px; }
+.hist-month { font-size: 11px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.hist-total { font-size: 20px; font-weight: 600; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+.hist-delta { font-size: 12px; margin-bottom: 8px; }
+.hist-bar-bg { background: var(--surface2); border-radius: 3px; height: 5px; overflow: hidden; }
+.hist-bar-fill { height: 5px; border-radius: 3px; background: var(--blue); transition: width 0.4s; }
+.mini-bars { display: flex; gap: 3px; align-items: flex-end; height: 32px; margin-top: 6px; }
+.mini-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mini-bar { width: 100%; border-radius: 2px 2px 0 0; }
+.mini-bar-lbl { font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+/* ── EXPORT ── */
+.export-card {
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  background: var(--green-bg);
+}
+.export-info { font-size: 13px; color: var(--text2); margin-bottom: 1rem; line-height: 1.7; }
+.export-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+.feature-list { font-size: 13px; color: var(--text2); line-height: 2; }
+
+/* ── SYNC IMPORT/EXPORT ── */
+.sync-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; background: var(--surface); }
+.sync-info { font-size: 13px; color: var(--text2); margin-bottom: 0.75rem; line-height: 1.6; }
+.sync-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── EMPTY ── */
+.empty { text-align: center; color: var(--text3); font-size: 13px; padding: 2rem 0; }
+
+/* ── PERSONS ── */
+.person-item { display: flex; align-items: center; gap: 10px; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; background: var(--surface); }
+
+@media (max-width: 500px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: 1fr 1fr; }
+  .main { padding: 1rem; }
+  .tabs { gap: 1px; }
+  .tab { padding: 7px 8px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <span class="logo">GASTOS</span>
+    <div class="month-select-wrap">
+      <select id="month-sel" onchange="changeMonth()"></select>
+      <button class="btn sm" onclick="addNewMonth()">+ Mes</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+      <div class="sync-dot ok" id="sync-dot"></div>
+      <span style="font-size:11px;color:var(--text3)" id="sync-label">local</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('gastos')">Gastos</button>
+    <button class="tab" onclick="showTab('personas')">Personas</button>
+    <button class="tab" onclick="showTab('metricas')">Métricas</button>
+    <button class="tab" onclick="showTab('division')">División</button>
+    <button class="tab" onclick="showTab('historial')">Historial</button>
+    <button class="tab" onclick="showTab('exportar')">Exportar</button>
+  </div>
+
+  <!-- GASTOS -->
+  <div id="tab-gastos" class="section active">
+    <div class="card">
+      <div class="card-title">Agregar gasto</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Descripción</label><input id="exp-name" placeholder="Ej: Netflix" style="width:100%"></div>
+        <div class="form-group"><label>Monto ($)</label><input id="exp-amount" type="number" placeholder="0" min="0" style="width:100%"></div>
+        <div class="form-group"><label>Categoría</label>
+          <select id="exp-cat" style="width:100%">
+            <option>Servicios</option><option>Comida</option><option>Transporte</option>
+            <option>Salud</option><option>Entretenimiento</option><option>Ropa</option><option>Otros</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Persona</label>
+          <select id="exp-person" style="width:100%"><option value="">— compartido —</option></select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="exp-recurring"> Recurrente (se copia cada mes)
+        </label>
+        <button class="btn primary" style="margin-left:auto" onclick="addExpense()">+ Agregar</button>
+      </div>
+    </div>
+    <div id="rec-list"></div>
+    <div id="reg-list"></div>
+  </div>
+
+  <!-- PERSONAS -->
+  <div id="tab-personas" class="section">
+    <div class="card">
+      <div class="card-title">Agregar persona</div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="form-group" style="flex:1"><label>Nombre</label><input id="person-name" placeholder="Nombre" style="width:100%"></div>
+        <div class="form-group"><label>Color</label><input id="person-color" type="color" value="#1a4a8a"></div>
+        <button class="btn primary" onclick="addPerson()">+ Agregar</button>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-top:10px">Las personas aplican a todos los meses.</p>
+    </div>
+    <div id="persons-list"></div>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div id="tab-metricas" class="section">
+    <div class="metric-grid" id="metrics-top"></div>
+    <div class="card"><div class="card-title">Por categoría</div><div id="cat-chart"></div></div>
+    <div class="card"><div class="card-title">Por persona</div><div id="person-chart"></div></div>
+  </div>
+
+  <!-- DIVISIÓN -->
+  <div id="tab-division" class="section">
+    <div class="card">
+      <div class="card-title">Modo de división</div>
+      <div class="div-mode-wrap">
+        <button class="btn" id="div-equal" onclick="setDivMode('equal')">Partes iguales</button>
+        <button class="btn" id="div-personal" onclick="setDivMode('personal')">Solo personales</button>
+        <button class="btn" id="div-mixed" onclick="setDivMode('mixed')">Compartido + personales</button>
+      </div>
+    </div>
+    <div id="division-result"></div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="tab-historial" class="section">
+    <div class="card"><div class="card-title">Comparativa de meses</div><div id="compare-months"></div></div>
+    <div class="card"><div class="card-title">Evolución por categoría</div><div id="hist-cats"></div></div>
+  </div>
+
+  <!-- EXPORTAR -->
+  <div id="tab-exportar" class="section">
+    <div class="export-card">
+      <div class="card-title" style="color:var(--green)">Exportar a Excel</div>
+      <p class="export-info">Descargá un archivo .xlsx con todos los datos del mes o de todos los meses.</p>
+      <div class="export-btns">
+        <button class="btn green" onclick="exportExcel('mes')">↓ Mes actual</button>
+        <button class="btn green" onclick="exportExcel('todo')">↓ Todos los meses</button>
+      </div>
+      <div id="export-status" style="font-size:12px;color:var(--green)"></div>
+    </div>
+
+    <div class="sync-card">
+      <div class="card-title">Sincronizar entre dispositivos</div>
+      <p class="sync-info">Los datos se guardan en este navegador. Para usarlos en otro dispositivo, exportá el backup y cargalo en el otro.</p>
+      <div class="sync-btns">
+        <button class="btn" onclick="exportBackup()">↓ Exportar backup (.json)</button>
+        <label class="btn" style="cursor:pointer">
+          ↑ Importar backup
+          <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
+        </label>
+      </div>
+      <div id="backup-status" style="font-size:12px;color:var(--text2);margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">¿Qué incluye el Excel?</div>
+      <div class="feature-list">
+        ✔ Hoja <strong>Gastos</strong> — listado completo con categoría y persona<br>
+        ✔ Hoja <strong>Resumen</strong> — totales por categoría con fórmulas<br>
+        ✔ Hoja <strong>División</strong> — cuánto paga cada persona<br>
+        ✔ Hoja <strong>Historial</strong> — comparativa de todos los meses
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CAT_COLORS = { Servicios:'#1a4a8a', Comida:'#2d6a4f', Transporte:'#7a4a00', Salud:'#8a1a1a', Entretenimiento:'#4a1a8a', Ropa:'#7a1a5a', Otros:'#4a4a4a' };
+const CAT_LIST = ['Servicios','Comida','Transporte','Salud','Entretenimiento','Ropa','Otros'];
+const STORAGE_KEY = 'gastos-app-v1';
+
+let state = {
+  persons: [
+    { id: 'p1', name: 'Yo', color: '#1a4a8a' },
+    { id: 'p2', name: 'Otro', color: '#2d6a4f' }
+  ],
+  months: {},
+  currentMonthKey: ''
+};
+let divMode = 'equal';
+let editingId = null;
+let currentTab = 'gastos';
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function keyToLabel(k) {
+  const [y, m] = k.split('-');
+  return `${MONTHS_ES[parseInt(m)-1]} ${y}`;
+}
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    setSyncStatus('ok', 'guardado');
+  } catch(e) {
+    setSyncStatus('err', 'error');
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  const k = todayKey();
+  if (!state.months[k]) state.months[k] = { expenses: [] };
+  if (!state.currentMonthKey || !state.months[state.currentMonthKey]) state.currentMonthKey = k;
+  setSyncStatus('ok', 'local');
+  renderAll();
+}
+
+function setSyncStatus(s, m) {
+  document.getElementById('sync-dot').className = 'sync-dot ' + s;
+  document.getElementById('sync-label').textContent = m;
+}
+
+function currentExpenses() { return state.months[state.currentMonthKey]?.expenses || []; }
+function setExpenses(arr) {
+  if (!state.months[state.currentMonthKey]) state.months[state.currentMonthKey] = { expenses: [] };
+  state.months[state.currentMonthKey].expenses = arr;
+}
+
+function showTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', ['gastos','personas','metricas','division','historial','exportar'][i] === t);
+  });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  if (t === 'metricas') renderMetrics();
+  if (t === 'division') renderDivision();
+  if (t === 'historial') renderHistorial();
+  if (t === 'personas') renderPersons();
+}
+
+function renderMonthSelect() {
+  const sel = document.getElementById('month-sel');
+  const keys = Object.keys(state.months).sort().reverse();
+  sel.innerHTML = keys.map(k => `<option value="${k}" ${k === state.currentMonthKey ? 'selected' : ''}>${keyToLabel(k)}</option>`).join('');
+}
+
+function changeMonth() {
+  state.currentMonthKey = document.getElementById('month-sel').value;
+  saveState();
+  renderExpenses();
+  if (currentTab === 'metricas') renderMetrics();
+  if (currentTab === 'division') renderDivision();
+}
+
+function addNewMonth() {
+  const now = new Date(); let y = now.getFullYear(), m = now.getMonth() + 1;
+  while (state.months[`${y}-${String(m).padStart(2,'0')}`]) { m--; if (m < 1) { m = 12; y--; } }
+  const k = `${y}-${String(m).padStart(2,'0')}`;
+  state.months[k] = { expenses: [] };
+  const keys = Object.keys(state.months).sort().reverse();
+  const latest = keys.find(x => x !== k);
+  if (latest) {
+    const recs = (state.months[latest]?.expenses || []).filter(e => e.recurring).map(e => ({ ...e, id: genId() }));
+    state.months[k].expenses = recs;
+  }
+  state.currentMonthKey = k;
+  saveState(); renderMonthSelect(); renderExpenses();
+}
+
+function updatePersonSelect() {
+  const sel = document.getElementById('exp-person');
+  sel.innerHTML = '<option value="">— compartido —</option>' +
+    state.persons.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function addPerson() {
+  const name = document.getElementById('person-name').value.trim();
+  if (!name) return;
+  state.persons.push({ id: genId(), name, color: document.getElementById('person-color').value });
+  document.getElementById('person-name').value = '';
+  saveState(); renderPersons(); updatePersonSelect();
+}
+
+function removePerson(id) {
+  state.persons = state.persons.filter(p => p.id !== id);
+  saveState(); renderPersons(); updatePersonSelect();
+}
+
+function renderPersons() {
+  const el = document.getElementById('persons-list');
+  el.innerHTML = state.persons.map(p => `
+    <div class="person-item">
+      <div style="width:12px;height:12px;border-radius:50%;background:${p.color};flex-shrink:0"></div>
+      <span style="flex:1;font-weight:500">${p.name}</span>
+      <button class="btn sm danger" onclick="removePerson('${p.id}')">Eliminar</button>
+    </div>`).join('') || '<div class="empty">Sin personas</div>';
+}
+
+function addExpense() {
+  const name = document.getElementById('exp-name').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  if (!name || isNaN(amount) || amount <= 0) return;
+  const personId = document.getElementById('exp-person').value || null;
+  const person = personId ? state.persons.find(p => p.id === personId) : null;
+  const exp = {
+    id: genId(), name, amount,
+    cat: document.getElementById('exp-cat').value,
+    personId, personName: person?.name || null, personColor: person?.color || null,
+    recurring: document.getElementById('exp-recurring').checked
+  };
+  const arr = currentExpenses(); arr.push(exp); setExpenses(arr);
+  document.getElementById('exp-name').value = '';
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-recurring').checked = false;
+  saveState(); renderExpenses();
+}
+
+function removeExpense(id) {
+  setExpenses(currentExpenses().filter(e => e.id !== id));
+  saveState(); renderExpenses();
+}
+
+function startEdit(id) { editingId = id; renderExpenses(); }
+function saveEdit(id) {
+  const v = parseFloat(document.getElementById('edit-' + id)?.value);
+  if (!isNaN(v) && v > 0) { setExpenses(currentExpenses().map(e => e.id === id ? { ...e, amount: v } : e)); saveState(); }
+  editingId = null; renderExpenses();
+}
+
+function renderExpItem(e) {
+  const amEl = editingId === e.id
+    ? `<input id="edit-${e.id}" class="amount-edit" type="number" value="${e.amount}" onblur="saveEdit('${e.id}')" onkeydown="if(event.key==='Enter')saveEdit('${e.id}')">`
+    : `<span class="exp-amount" onclick="startEdit('${e.id}')" title="Clic para editar">$${e.amount.toLocaleString('es-AR')}</span>`;
+  const perEl = e.personName
+    ? `<span class="exp-person" style="color:${e.personColor};font-weight:500">${e.personName}</span>`
+    : `<span class="exp-person" style="color:var(--text3)">compartido</span>`;
+  return `<div class="exp-item ${e.recurring ? 'rec' : ''}">
+    ${e.recurring ? `<span class="badge rec">↺</span>` : ''}
+    <span class="exp-name">${e.name}</span>
+    <span class="badge cat">${e.cat}</span>
+    ${perEl}${amEl}
+    <button class="btn sm danger" onclick="removeExpense('${e.id}')">✕</button>
+  </div>`;
+}
+
+function renderExpenses() {
+  const exps = currentExpenses();
+  const rec = exps.filter(e => e.recurring);
+  const reg = exps.filter(e => !e.recurring);
+  document.getElementById('rec-list').innerHTML =
+    `<div class="exp-section-label"><span class="rec-indicator"></span>Recurrentes</div>` +
+    (rec.length ? rec.map(renderExpItem).join('') : '<div class="empty">Sin gastos recurrentes</div>');
+  document.getElementById('reg-list').innerHTML =
+    `<div class="exp-section-label">Gastos del mes</div>` +
+    (reg.length ? reg.map(renderExpItem).join('') : '<div class="empty">Agregá el primer gasto del mes</div>');
+  if (editingId) setTimeout(() => { const el = document.getElementById('edit-' + editingId); if (el) { el.focus(); el.select(); } }, 40);
+}
+
+function renderMetrics() {
+  const exps = currentExpenses();
+  const total = exps.reduce((s, e) => s + e.amount, 0);
+  const rec = exps.filter(e => e.recurring).reduce((s, e) => s + e.amount, 0);
+  const cats = {}; exps.forEach(e => { cats[e.cat] = (cats[e.cat] || 0) + e.amount; });
+  document.getElementById('metrics-top').innerHTML = `
+    <div class="metric"><div class="metric-label">Total mes</div><div class="metric-value">$${total.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Recurrentes</div><div class="metric-value green">$${rec.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Servicios</div><div class="metric-value blue">$${(cats['Servicios']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Comida</div><div class="metric-value amber">$${(cats['Comida']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Transporte</div><div class="metric-value red">$${(cats['Transporte']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Entretenimiento</div><div class="metric-value purple">$${(cats['Entretenimiento']||0).toLocaleString('es-AR')}</div></div>`;
+  const catEl = document.getElementById('cat-chart');
+  if (!total) { catEl.innerHTML = '<div class="empty">Sin datos</div>'; document.getElementById('person-chart').innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  catEl.innerHTML = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([cat, val]) => `
+    <div class="chart-row">
+      <div class="chart-lbl"><span>${cat}</span><span>$${val.toLocaleString('es-AR')} · ${Math.round(val/total*100)}%</span></div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(val/total*100)}%;background:${CAT_COLORS[cat]||'#888'}"></div></div>
+    </div>`).join('');
+  const byP = {}; exps.forEach(e => { const k = e.personName || 'Compartido'; byP[k] = { total: (byP[k]?.total || 0) + e.amount, color: e.personColor || '#888' }; });
+  document.getElementById('person-chart').innerHTML = Object.entries(byP).sort((a, b) => b[1].total - a[1].total).map(([name, d]) => `
+    <div class="chart-row">
+      <div class="chart-lbl"><span>${name}</span><span>$${d.total.toLocaleString('es-AR')} · ${Math.round(d.total/total*100)}%</span></div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(d.total/total*100)}%;background:${d.color}"></div></div>
+    </div>`).join('');
+}
+
+function setDivMode(m) {
+  divMode = m;
+  ['equal','personal','mixed'].forEach(x => {
+    const btn = document.getElementById('div-' + x);
+    btn.style.background = x === m ? 'var(--text)' : '';
+    btn.style.color = x === m ? 'var(--surface)' : '';
+    btn.style.borderColor = x === m ? 'var(--text)' : '';
+  });
+  renderDivision();
+}
+
+function calcDivision(exps, mode) {
+  const sharedTotal = exps.filter(e => !e.personId).reduce((s, e) => s + e.amount, 0);
+  const grandTotal = exps.reduce((s, e) => s + e.amount, 0);
+  const shareEach = state.persons.length ? sharedTotal / state.persons.length : 0;
+  return state.persons.map(p => {
+    const personal = exps.filter(e => e.personId === p.id).reduce((s, e) => s + e.amount, 0);
+    const total = mode === 'equal' ? grandTotal / (state.persons.length || 1)
+      : mode === 'personal' ? personal : personal + shareEach;
+    return { name: p.name, color: p.color, personal, shareEach, total };
+  });
+}
+
+function renderDivision() {
+  const el = document.getElementById('division-result');
+  const exps = currentExpenses();
+  if (!state.persons.length) { el.innerHTML = '<div class="empty">Agregá personas primero</div>'; return; }
+  if (!exps.length) { el.innerHTML = '<div class="empty">Sin gastos este mes</div>'; return; }
+  const divs = calcDivision(exps, divMode);
+  el.innerHTML = divs.map(d => {
+    const rows = divMode === 'equal'
+      ? `<div class="div-row"><span>Total mes</span><span>$${exps.reduce((s,e)=>s+e.amount,0).toLocaleString('es-AR')}</span></div>`
+      : divMode === 'personal'
+        ? `<div class="div-row"><span>Gastos propios</span><span>$${d.personal.toLocaleString('es-AR')}</span></div>`
+        : `<div class="div-row"><span>Gastos propios</span><span>$${d.personal.toLocaleString('es-AR')}</span></div>
+           <div class="div-row"><span>Parte compartida (${state.persons.length} personas)</span><span>$${Math.round(d.shareEach).toLocaleString('es-AR')}</span></div>`;
+    return `<div class="div-card">
+      <div class="div-card-head"><span style="width:11px;height:11px;border-radius:50%;background:${d.color};display:inline-block"></span>${d.name}</div>
+      ${rows}
+      <div class="div-total"><span>A pagar</span><span>$${Math.round(d.total).toLocaleString('es-AR')}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistorial() {
+  const keys = Object.keys(state.months).sort().reverse();
+  const compareEl = document.getElementById('compare-months');
+  if (keys.length < 1) { compareEl.innerHTML = '<div class="empty">Sin historial aún</div>'; return; }
+  const totals = keys.map(k => ({ k, label: keyToLabel(k), total: state.months[k].expenses.reduce((s, e) => s + e.amount, 0) }));
+  const max = Math.max(...totals.map(t => t.total), 1);
+  compareEl.innerHTML = totals.map((t, i) => {
+    const prev = totals[i + 1];
+    let delta = '';
+    if (prev && prev.total > 0) {
+      const pct = Math.round((t.total - prev.total) / prev.total * 100);
+      delta = `<div class="hist-delta" style="color:${pct > 0 ? 'var(--red)' : 'var(--green)'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)}% vs mes anterior</div>`;
+    }
+    return `<div class="hist-card">
+      <div class="hist-month">${t.label}</div>
+      <div class="hist-total">$${t.total.toLocaleString('es-AR')}</div>
+      ${delta}
+      <div class="hist-bar-bg"><div class="hist-bar-fill" style="width:${Math.round(t.total/max*100)}%"></div></div>
+    </div>`;
+  }).join('');
+  const histEl = document.getElementById('hist-cats');
+  const catData = {};
+  CAT_LIST.forEach(c => { catData[c] = keys.slice(0, 6).reverse().map(k => ({ label: keyToLabel(k).slice(0, 3), val: (state.months[k].expenses || []).filter(e => e.cat === c).reduce((s, e) => s + e.amount, 0) })); });
+  const catMax = Math.max(...Object.values(catData).flat().map(d => d.val), 1);
+  histEl.innerHTML = CAT_LIST.filter(c => catData[c].some(d => d.val > 0)).map(c => `
+    <div class="chart-row" style="margin-bottom:14px">
+      <div class="chart-lbl" style="margin-bottom:6px"><span style="font-weight:500">${c}</span></div>
+      <div class="mini-bars">
+        ${catData[c].map(d => `<div class="mini-bar-wrap">
+          <div class="mini-bar" style="background:${CAT_COLORS[c]};height:${Math.round(d.val/catMax*28)}px;min-height:${d.val>0?2:0}px"></div>
+          <span class="mini-bar-lbl">${d.label}</span>
+        </div>`).join('')}
+      </div>
+    </div>`).join('') || '<div class="empty">Sin datos suficientes</div>';
+}
+
+// ── EXCEL ────────────────────────────────────────────────────────────────────
+function buildWorkbook(monthKeys) {
+  const wb = XLSX.utils.book_new();
+  monthKeys.forEach(mk => {
+    const label = keyToLabel(mk);
+    const exps = state.months[mk]?.expenses || [];
+    const total = exps.reduce((s, e) => s + e.amount, 0);
+    const cats = {}; exps.forEach(e => { cats[e.cat] = (cats[e.cat] || 0) + e.amount; });
+
+    const wsG = XLSX.utils.aoa_to_sheet([
+      ['Descripción','Categoría','Persona','Monto ($)','Tipo'],
+      ...exps.map(e => [e.name, e.cat, e.personName||'Compartido', e.amount, e.recurring?'Recurrente':'Variable']),
+      [], ['TOTAL','','', `=SUM(D2:D${exps.length+1})`, '']
+    ]);
+    wsG['!cols'] = [{wch:28},{wch:16},{wch:16},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsG, `Gastos ${label}`.slice(0,31));
+
+    const resRows = [['Categoría','Monto ($)','% del total'], ...CAT_LIST.filter(c=>cats[c]).map(c => [c, cats[c], total>0?Math.round(cats[c]/total*100)+'%':'0%']), [], ['TOTAL', total, '100%']];
+    const wsR = XLSX.utils.aoa_to_sheet(resRows);
+    wsR['!cols'] = [{wch:20},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsR, `Resumen ${label}`.slice(0,31));
+
+    const divs = calcDivision(exps, divMode);
+    const wsD = XLSX.utils.aoa_to_sheet([
+      ['Persona','Gastos propios ($)','Parte compartida ($)','Total a pagar ($)'],
+      ...divs.map(d => [d.name, Math.round(d.personal), Math.round(d.shareEach), Math.round(d.total)])
+    ]);
+    wsD['!cols'] = [{wch:18},{wch:20},{wch:22},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsD, `División ${label}`.slice(0,31));
+  });
+  if (monthKeys.length > 1) {
+    const histRows = [['Mes','Total ($)',...CAT_LIST]];
+    monthKeys.slice().reverse().forEach(mk => {
+      const exps = state.months[mk]?.expenses || [];
+      const cats = {}; exps.forEach(e => { cats[e.cat] = (cats[e.cat]||0)+e.amount; });
+      histRows.push([keyToLabel(mk), exps.reduce((s,e)=>s+e.amount,0), ...CAT_LIST.map(c=>cats[c]||0)]);
+    });
+    const wsH = XLSX.utils.aoa_to_sheet(histRows);
+    wsH['!cols'] = [{wch:18},{wch:14},...CAT_LIST.map(()=>({wch:14}))];
+    XLSX.utils.book_append_sheet(wb, wsH, 'Historial');
+  }
+  return wb;
+}
+
+function exportExcel(mode) {
+  const keys = Object.keys(state.months).sort().reverse();
+  if (!keys.length) { document.getElementById('export-status').textContent = 'Sin datos para exportar.'; return; }
+  const monthKeys = mode === 'mes' ? [state.currentMonthKey] : keys;
+  document.getElementById('export-status').textContent = 'Generando...';
+  setTimeout(() => {
+    try {
+      const wb = buildWorkbook(monthKeys);
+      const label = mode === 'mes' ? keyToLabel(state.currentMonthKey) : 'Completo';
+      XLSX.writeFile(wb, `Gastos ${label}.xlsx`);
+      document.getElementById('export-status').textContent = '✔ Descargado correctamente';
+    } catch(e) { document.getElementById('export-status').textContent = 'Error al generar el archivo.'; }
+  }, 100);
+}
+
+// ── BACKUP JSON ───────────────────────────────────────────────────────────────
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `gastos-backup-${todayKey()}.json`;
+  a.click();
+  document.getElementById('backup-status').textContent = '✔ Backup descargado';
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.months || !parsed.persons) throw new Error();
+      state = parsed;
+      if (!state.months[state.currentMonthKey]) state.currentMonthKey = Object.keys(state.months).sort().reverse()[0] || todayKey();
+      saveState(); renderAll();
+      document.getElementById('backup-status').textContent = '✔ Datos importados correctamente';
+    } catch(err) {
+      document.getElementById('backup-status').textContent = '✗ Archivo inválido';
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function renderAll() { renderMonthSelect(); updatePersonSelect(); renderPersons(); renderExpenses(); }
+loadState();
+setDivMode('equal');
+</script>
+</body>
+</html>
