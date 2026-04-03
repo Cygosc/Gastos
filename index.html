@@ -119,6 +119,26 @@ input[type=color]{width:44px;padding:2px 4px;cursor:pointer}
 .loading-screen.hidden{display:none}
 .loading-spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 .loading-text{font-size:13px;color:var(--text2);font-family:'DM Mono',monospace}
+
+/* Toggle switch recurrente */
+.toggle-wrap{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.toggle-track{width:40px;height:22px;border-radius:11px;background:var(--border2);transition:background .2s;flex-shrink:0;position:relative}
+.toggle-track.on{background:var(--green)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-track.on .toggle-thumb{transform:translateX(18px)}
+.toggle-label{font-size:13px;color:var(--text2);transition:color .2s}
+.toggle-track.on + .toggle-label{color:var(--green);font-weight:500}
+
+/* Edición inline categoría en gasto */
+.cat-select-inline{height:26px;font-size:11px;padding:0 6px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-family:'DM Mono',monospace;font-weight:500;color:var(--text2);cursor:pointer}
+.cat-select-inline:focus{outline:none;border-color:var(--accent)}
+
+/* Gestión de categorías */
+.cat-item{display:flex;align-items:center;gap:10px;padding:.65rem 1rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;background:var(--surface)}
+.cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cat-name-edit{flex:1;border:none;background:none;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 4px;border-radius:4px}
+.cat-name-edit:focus{outline:1px solid var(--accent);background:var(--bg)}
+
 @media(max-width:500px){.form-grid{grid-template-columns:1fr}.metric-grid{grid-template-columns:1fr 1fr}.main{padding:1rem}.tab{padding:7px 7px;font-size:12px}}
 </style>
 </head>
@@ -147,6 +167,7 @@ input[type=color]{width:44px;padding:2px 4px;cursor:pointer}
   <div class="tabs">
     <button class="tab active" onclick="showTab('gastos')">Gastos</button>
     <button class="tab" onclick="showTab('personas')">Personas</button>
+    <button class="tab" onclick="showTab('categorias')">Categorías</button>
     <button class="tab" onclick="showTab('metricas')">Métricas</button>
     <button class="tab" onclick="showTab('division')">División</button>
     <button class="tab" onclick="showTab('historial')">Historial</button>
@@ -160,19 +181,17 @@ input[type=color]{width:44px;padding:2px 4px;cursor:pointer}
         <div class="form-group"><label>Descripción</label><input id="exp-name" placeholder="Ej: Netflix" style="width:100%"></div>
         <div class="form-group"><label>Monto ($)</label><input id="exp-amount" type="number" placeholder="0" min="0" style="width:100%"></div>
         <div class="form-group"><label>Categoría</label>
-          <select id="exp-cat" style="width:100%">
-            <option>Servicios</option><option>Comida</option><option>Transporte</option>
-            <option>Salud</option><option>Entretenimiento</option><option>Ropa</option><option>Otros</option>
-          </select>
+          <select id="exp-cat" style="width:100%"></select>
         </div>
         <div class="form-group"><label>Persona</label>
           <select id="exp-person" style="width:100%"><option value="">— compartido —</option></select>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-          <input type="checkbox" id="exp-recurring"> Recurrente (se copia cada mes)
-        </label>
+        <div class="toggle-wrap" onclick="toggleRecurring()">
+          <div class="toggle-track" id="rec-toggle"><div class="toggle-thumb"></div></div>
+          <span class="toggle-label" id="rec-toggle-label">Recurrente (se copia cada mes)</span>
+        </div>
         <button class="btn primary" style="margin-left:auto" onclick="addExpense()">+ Agregar</button>
       </div>
     </div>
@@ -193,7 +212,18 @@ input[type=color]{width:44px;padding:2px 4px;cursor:pointer}
     <div id="persons-list"></div>
   </div>
 
-  <div id="tab-metricas" class="section">
+  <div id="tab-categorias" class="section">
+    <div class="card">
+      <div class="card-title">Agregar categoría</div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="form-group" style="flex:1"><label>Nombre</label><input id="cat-name" placeholder="Ej: Mascota" style="width:100%"></div>
+        <div class="form-group"><label>Color</label><input id="cat-color" type="color" value="#2d6a4f"></div>
+        <button class="btn primary" onclick="addCategory()">+ Agregar</button>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-top:10px">Las categorías se sincronizan entre todos los dispositivos. Podés editar el nombre haciendo clic sobre él.</p>
+    </div>
+    <div id="categories-list"></div>
+  </div>
     <div class="metric-grid" id="metrics-top"></div>
     <div class="card"><div class="card-title">Por categoría</div><div id="cat-chart"></div></div>
     <div class="card"><div class="card-title">Por persona</div><div id="person-chart"></div></div>
@@ -256,12 +286,14 @@ const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const CAT_COLORS = { Servicios:'#1a4a8a', Comida:'#2d6a4f', Transporte:'#7a4a00', Salud:'#8a1a1a', Entretenimiento:'#4a1a8a', Ropa:'#7a1a5a', Otros:'#4a4a4a' };
-const CAT_LIST   = ['Servicios','Comida','Transporte','Salud','Entretenimiento','Ropa','Otros'];
+const DEFAULT_CATS = [
+  {name:'Servicios',color:'#1a4a8a'},{name:'Comida',color:'#2d6a4f'},{name:'Transporte',color:'#7a4a00'},
+  {name:'Salud',color:'#8a1a1a'},{name:'Entretenimiento',color:'#4a1a8a'},{name:'Ropa',color:'#7a1a5a'},{name:'Otros',color:'#4a4a4a'}
+];
 
-let persons = [], months = {}, currentMonthKey = '';
+let persons = [], months = {}, currentMonthKey = '', categories = [];
 let divMode = 'equal', editingId = null, currentTab = 'gastos';
-let currentMonthUnsub = null;
+let recurringOn = false;
 
 const $id = id => document.getElementById(id);
 function todayKey(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
@@ -269,11 +301,18 @@ function keyToLabel(k){ const[y,m]=k.split('-'); return `${MONTHS_ES[parseInt(m)
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function setSyncStatus(s,m){ $id('sync-dot').className='sync-dot '+s; $id('sync-label').textContent=m; }
 function currentExpenses(){ return months[currentMonthKey]?.expenses||[]; }
+function catColor(name){ return categories.find(c=>c.name===name)?.color||'#888'; }
+function catList(){ return categories.map(c=>c.name); }
+let currentMonthUnsub = null;
 
 // ── FIREBASE WRITES ───────────────────────────────────────────────────────────
 async function savePersons(){
   setSyncStatus('saving','guardando...');
   await setDoc(doc(db,'data','persons'),{list:persons});
+}
+async function saveCategories(){
+  setSyncStatus('saving','guardando...');
+  await setDoc(doc(db,'data','categories'),{list:categories});
 }
 async function saveMonthIndex(){
   await setDoc(doc(db,'data','months'),{list:Object.keys(months)});
@@ -305,6 +344,14 @@ function startListeners(){
     setSyncStatus('ok','sync ●');
   }, ()=>setSyncStatus('err','error'));
 
+  onSnapshot(doc(db,'data','categories'), snap=>{
+    categories = snap.exists()&&snap.data().list?.length ? snap.data().list : [...DEFAULT_CATS];
+    updateCatSelects();
+    renderCategories();
+    if(currentTab==='metricas') renderMetrics();
+    setSyncStatus('ok','sync ●');
+  }, ()=>setSyncStatus('err','error'));
+
   onSnapshot(doc(db,'data','months'), snap=>{
     const list = snap.exists()?(snap.data().list||[]):[];
     list.forEach(k=>{ if(!months[k]) months[k]={expenses:[]}; });
@@ -318,6 +365,10 @@ function startListeners(){
 async function init(){
   setSyncStatus('saving','conectando...');
   const k = todayKey();
+  // Load categories first so selects populate correctly
+  const catSnap = await getDoc(doc(db,'data','categories'));
+  categories = catSnap.exists()&&catSnap.data().list?.length ? catSnap.data().list : [...DEFAULT_CATS];
+  updateCatSelects();
   const snap = await getDoc(doc(db,'months',k));
   months[k] = { expenses: snap.exists()?(snap.data().expenses||[]):[] };
   if(!snap.exists()){ await saveMonthIndex(); await saveMonthExpenses(k); }
@@ -327,7 +378,65 @@ async function init(){
 }
 init().catch(()=>{ $id('loading-screen').classList.add('hidden'); setSyncStatus('err','sin conexión'); });
 
-// ── MONTHS ────────────────────────────────────────────────────────────────────
+// ── TOGGLE RECURRENTE ─────────────────────────────────────────────────────────
+window.toggleRecurring=function(){
+  recurringOn=!recurringOn;
+  const t=$id('rec-toggle'); t.classList.toggle('on',recurringOn);
+};
+
+// ── CATEGORIES ────────────────────────────────────────────────────────────────
+function updateCatSelects(){
+  const opts=categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  $id('exp-cat').innerHTML=opts;
+  // update all inline cat selects in expense items
+  document.querySelectorAll('.cat-select-inline').forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=opts;
+    if(categories.find(c=>c.name===cur)) sel.value=cur;
+  });
+}
+
+window.addCategory=async function(){
+  const name=$id('cat-name').value.trim();
+  if(!name||categories.find(c=>c.name===name)) return;
+  categories.push({name,color:$id('cat-color').value});
+  $id('cat-name').value='';
+  await saveCategories();
+};
+
+window.removeCategory=async function(name){
+  if(categories.length<=1) return;
+  categories=categories.filter(c=>c.name!==name);
+  await saveCategories();
+};
+
+window.updateCatColor=async function(name,color){
+  categories=categories.map(c=>c.name===name?{...c,color}:c);
+  // update expenses that have this category rendered
+  renderExpenses();
+  if(currentTab==='metricas') renderMetrics();
+  await saveCategories();
+};
+
+window.updateCatName=async function(oldName, newName){
+  newName=newName.trim();
+  if(!newName||newName===oldName||categories.find(c=>c.name===newName)) return;
+  categories=categories.map(c=>c.name===oldName?{...c,name:newName}:c);
+  // update existing expenses
+  const exps=currentExpenses().map(e=>e.cat===oldName?{...e,cat:newName}:e);
+  months[currentMonthKey].expenses=exps;
+  await Promise.all([saveCategories(), saveMonthExpenses(currentMonthKey)]);
+};
+
+function renderCategories(){
+  const el=$id('categories-list');
+  el.innerHTML=categories.map(c=>`
+    <div class="cat-item">
+      <input type="color" class="cat-dot" style="width:24px;height:24px;border:none;background:none;cursor:pointer;border-radius:50%;padding:0" value="${c.color}" onchange="updateCatColor('${c.name}',this.value)" title="Cambiar color">
+      <input class="cat-name-edit" value="${c.name}" onblur="updateCatName('${c.name}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" title="Clic para editar nombre">
+      <button class="btn sm danger" onclick="removeCategory('${c.name}')" ${categories.length<=1?'disabled':''}>Eliminar</button>
+    </div>`).join('');
+}
 function renderMonthSelect(){
   const sel=$id('month-sel'), keys=Object.keys(months).sort().reverse();
   sel.innerHTML=keys.map(k=>`<option value="${k}" ${k===currentMonthKey?'selected':''}>${keyToLabel(k)}</option>`).join('');
@@ -369,10 +478,11 @@ window.addExpense=async function(){
   const name=$id('exp-name').value.trim(), amount=parseFloat($id('exp-amount').value);
   if(!name||isNaN(amount)||amount<=0) return;
   const personId=$id('exp-person').value||null, person=personId?persons.find(p=>p.id===personId):null;
-  const exp={id:genId(),name,amount,cat:$id('exp-cat').value,personId,personName:person?.name||null,personColor:person?.color||null,recurring:$id('exp-recurring').checked};
+  const exp={id:genId(),name,amount,cat:$id('exp-cat').value,personId,personName:person?.name||null,personColor:person?.color||null,recurring:recurringOn};
   if(!months[currentMonthKey]) months[currentMonthKey]={expenses:[]};
   months[currentMonthKey].expenses.push(exp);
-  $id('exp-name').value=''; $id('exp-amount').value=''; $id('exp-recurring').checked=false;
+  $id('exp-name').value=''; $id('exp-amount').value='';
+  recurringOn=false; $id('rec-toggle').classList.remove('on');
   await saveMonthExpenses(currentMonthKey);
 };
 window.removeExpense=async function(id){
@@ -385,19 +495,28 @@ window.saveEdit=async function(id){
   if(!isNaN(v)&&v>0){ months[currentMonthKey].expenses=months[currentMonthKey].expenses.map(e=>e.id===id?{...e,amount:v}:e); await saveMonthExpenses(currentMonthKey); }
   editingId=null; renderExpenses();
 };
+window.editExpCat=async function(id,cat){
+  months[currentMonthKey].expenses=months[currentMonthKey].expenses.map(e=>e.id===id?{...e,cat}:e);
+  await saveMonthExpenses(currentMonthKey);
+};
+window.toggleExpRecurring=async function(id){
+  months[currentMonthKey].expenses=months[currentMonthKey].expenses.map(e=>e.id===id?{...e,recurring:!e.recurring}:e);
+  await saveMonthExpenses(currentMonthKey);
+};
 
 function renderExpItem(e){
   const amEl=editingId===e.id
     ?`<input id="edit-${e.id}" class="amount-edit" type="number" value="${e.amount}" onblur="saveEdit('${e.id}')" onkeydown="if(event.key==='Enter')saveEdit('${e.id}')">`
-    :`<span class="exp-amount" onclick="startEdit('${e.id}')" title="Clic para editar">$${e.amount.toLocaleString('es-AR')}</span>`;
+    :`<span class="exp-amount" onclick="startEdit('${e.id}')" title="Clic para editar monto">$${e.amount.toLocaleString('es-AR')}</span>`;
   const perEl=e.personName
     ?`<span class="exp-person" style="color:${e.personColor};font-weight:500">${e.personName}</span>`
     :`<span class="exp-person" style="color:var(--text3)">compartido</span>`;
+  const catOpts=categories.map(c=>`<option value="${c.name}" ${c.name===e.cat?'selected':''}>${c.name}</option>`).join('');
+  const recBtn=`<button class="btn sm" onclick="toggleExpRecurring('${e.id}')" title="${e.recurring?'Quitar recurrente':'Marcar como recurrente'}" style="padding:0 8px;${e.recurring?'border-color:var(--green);color:var(--green);background:var(--green-bg)':'color:var(--text3)'}">↺</button>`;
   return `<div class="exp-item ${e.recurring?'rec':''}">
-    ${e.recurring?`<span class="badge rec">↺</span>`:''}
     <span class="exp-name">${e.name}</span>
-    <span class="badge cat">${e.cat}</span>
-    ${perEl}${amEl}
+    <select class="cat-select-inline" onchange="editExpCat('${e.id}',this.value)" title="Cambiar categoría">${catOpts}</select>
+    ${perEl}${amEl}${recBtn}
     <button class="btn sm danger" onclick="removeExpense('${e.id}')">✕</button>
   </div>`;
 }
@@ -412,18 +531,18 @@ function renderExpenses(){
 function renderMetrics(){
   const exps=currentExpenses(), total=exps.reduce((s,e)=>s+e.amount,0), rec=exps.filter(e=>e.recurring).reduce((s,e)=>s+e.amount,0);
   const cats={}; exps.forEach(e=>{ cats[e.cat]=(cats[e.cat]||0)+e.amount; });
+  // dynamic metrics for all categories
+  const topCats=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const metricColors=['green','blue','amber','red','purple'];
   $id('metrics-top').innerHTML=`
     <div class="metric"><div class="metric-label">Total mes</div><div class="metric-value">$${total.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Recurrentes</div><div class="metric-value green">$${rec.toLocaleString('es-AR')}</div></div>
-    <div class="metric"><div class="metric-label">Servicios</div><div class="metric-value blue">$${(cats['Servicios']||0).toLocaleString('es-AR')}</div></div>
-    <div class="metric"><div class="metric-label">Comida</div><div class="metric-value amber">$${(cats['Comida']||0).toLocaleString('es-AR')}</div></div>
-    <div class="metric"><div class="metric-label">Transporte</div><div class="metric-value red">$${(cats['Transporte']||0).toLocaleString('es-AR')}</div></div>
-    <div class="metric"><div class="metric-label">Entretenimiento</div><div class="metric-value purple">$${(cats['Entretenimiento']||0).toLocaleString('es-AR')}</div></div>`;
+    ${topCats.map(([cat,val],i)=>`<div class="metric"><div class="metric-label">${cat}</div><div class="metric-value ${metricColors[i+1]||''}">$${val.toLocaleString('es-AR')}</div></div>`).join('')}`;
   if(!total){ $id('cat-chart').innerHTML='<div class="empty">Sin datos</div>'; $id('person-chart').innerHTML='<div class="empty">Sin datos</div>'; return; }
   $id('cat-chart').innerHTML=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>`
     <div class="chart-row">
       <div class="chart-lbl"><span>${cat}</span><span>$${val.toLocaleString('es-AR')} · ${Math.round(val/total*100)}%</span></div>
-      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(val/total*100)}%;background:${CAT_COLORS[cat]||'#888'}"></div></div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(val/total*100)}%;background:${catColor(cat)}"></div></div>
     </div>`).join('');
   const byP={}; exps.forEach(e=>{ const k=e.personName||'Compartido'; byP[k]={total:(byP[k]?.total||0)+e.amount,color:e.personColor||'#888'}; });
   $id('person-chart').innerHTML=Object.entries(byP).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>`
@@ -553,14 +672,14 @@ async function renderHistorial(){
   }).join('');
   const histEl=$id('hist-cats');
   const catData={};
-  CAT_LIST.forEach(c=>{ catData[c]=keys.slice(0,6).reverse().map(k=>({label:keyToLabel(k).slice(0,3),val:(months[k]?.expenses||[]).filter(e=>e.cat===c).reduce((s,e)=>s+e.amount,0)})); });
+  catList().forEach(c=>{ catData[c]=keys.slice(0,6).reverse().map(k=>({label:keyToLabel(k).slice(0,3),val:(months[k]?.expenses||[]).filter(e=>e.cat===c).reduce((s,e)=>s+e.amount,0)})); });
   const catMax=Math.max(...Object.values(catData).flat().map(d=>d.val),1);
-  histEl.innerHTML=CAT_LIST.filter(c=>catData[c].some(d=>d.val>0)).map(c=>`
+  histEl.innerHTML=catList().filter(c=>catData[c].some(d=>d.val>0)).map(c=>`
     <div class="chart-row" style="margin-bottom:14px">
       <div class="chart-lbl" style="margin-bottom:6px"><span style="font-weight:500">${c}</span></div>
       <div class="mini-bars">${catData[c].map(d=>`
         <div class="mini-bar-wrap">
-          <div class="mini-bar" style="background:${CAT_COLORS[c]};height:${Math.round(d.val/catMax*28)}px;min-height:${d.val>0?2:0}px"></div>
+          <div class="mini-bar" style="background:${catColor(c)};height:${Math.round(d.val/catMax*28)}px;min-height:${d.val>0?2:0}px"></div>
           <span class="mini-bar-lbl">${d.label}</span>
         </div>`).join('')}
       </div>
@@ -570,18 +689,21 @@ async function renderHistorial(){
 // ── TABS ──────────────────────────────────────────────────────────────────────
 window.showTab=function(t){
   currentTab=t;
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['gastos','personas','metricas','division','historial','exportar'][i]===t));
+  const tabNames=['gastos','personas','categorias','metricas','division','historial','exportar'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',tabNames[i]===t));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   $id('tab-'+t).classList.add('active');
   if(t==='metricas') renderMetrics();
   if(t==='division') renderDivision();
   if(t==='historial') renderHistorial();
   if(t==='personas') renderPersons();
+  if(t==='categorias') renderCategories();
 };
 
 // ── EXCEL ─────────────────────────────────────────────────────────────────────
 function buildWorkbook(monthKeys){
   const wb=XLSX.utils.book_new();
+  const CL=catList();
   monthKeys.forEach(mk=>{
     const label=keyToLabel(mk), exps=months[mk]?.expenses||[];
     const total=exps.reduce((s,e)=>s+e.amount,0), cats={};
@@ -595,7 +717,7 @@ function buildWorkbook(monthKeys){
     XLSX.utils.book_append_sheet(wb,wsG,`Gastos ${label}`.slice(0,31));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
       ['Categoría','Monto ($)','% del total'],
-      ...CAT_LIST.filter(c=>cats[c]).map(c=>[c,cats[c],total>0?Math.round(cats[c]/total*100)+'%':'0%']),
+      ...Object.entries(cats).map(([c,v])=>[c,v,total>0?Math.round(v/total*100)+'%':'0%']),
       [],['TOTAL',total,'100%']
     ]),`Resumen ${label}`.slice(0,31));
     const divs=calcDivision(exps,divMode);
@@ -610,14 +732,14 @@ function buildWorkbook(monthKeys){
     XLSX.utils.book_append_sheet(wb,wsD,`División ${label}`.slice(0,31));
   });
   if(monthKeys.length>1){
-    const histRows=[['Mes','Total ($)',...CAT_LIST]];
+    const histRows=[['Mes','Total ($)',...CL]];
     monthKeys.slice().reverse().forEach(mk=>{
       const exps=months[mk]?.expenses||[], cats={};
       exps.forEach(e=>{ cats[e.cat]=(cats[e.cat]||0)+e.amount; });
-      histRows.push([keyToLabel(mk),exps.reduce((s,e)=>s+e.amount,0),...CAT_LIST.map(c=>cats[c]||0)]);
+      histRows.push([keyToLabel(mk),exps.reduce((s,e)=>s+e.amount,0),...CL.map(c=>cats[c]||0)]);
     });
     const wsH=XLSX.utils.aoa_to_sheet(histRows);
-    wsH['!cols']=[{wch:18},{wch:14},...CAT_LIST.map(()=>({wch:14}))];
+    wsH['!cols']=[{wch:18},{wch:14},...CL.map(()=>({wch:14}))];
     XLSX.utils.book_append_sheet(wb,wsH,'Historial');
   }
   return wb;
