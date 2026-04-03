@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos Mensuales</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f5f4f0; --surface: #ffffff; --surface2: #f0efe9;
+  --border: #e2e0d8; --border2: #ccc9be;
+  --text: #1a1917; --text2: #6b6860; --text3: #a09e98;
+  --green: #2d6a4f; --green-bg: #e8f5ee;
+  --blue: #1a4a8a; --blue-bg: #e8eef8;
+  --amber: #7a4a00; --red: #8a1a1a; --red-bg: #fde8e8;
+  --purple: #4a1a8a; --accent: #2d6a4f;
+  --radius: 10px; --radius-sm: 6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:3rem}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.25rem;position:sticky;top:0;z-index:100}
+.header-inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px;height:56px}
+.logo{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--accent);letter-spacing:.05em;flex-shrink:0}
+.month-select-wrap{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.month-select-wrap select{flex:1;min-width:0;font-weight:500}
+.sync-wrap{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#bbb;transition:background .3s}
+.sync-dot.ok{background:#2d6a4f}
+.sync-dot.saving{background:#d4860a;animation:pulse 1s infinite}
+.sync-dot.err{background:#8a1a1a}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main{max-width:720px;margin:0 auto;padding:1.25rem}
+.tabs{display:flex;gap:2px;margin-bottom:1.25rem;background:var(--surface2);border-radius:var(--radius);padding:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{flex:1;min-width:fit-content;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:400;cursor:pointer;border:none;background:none;color:var(--text2);border-radius:var(--radius-sm);transition:all .15s;white-space:nowrap}
+.tab.active{background:var(--surface);color:var(--text);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.section{display:none}.section.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:1rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:var(--text2)}
+input,select{height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;font-family:'DM Sans',sans-serif;appearance:none;-webkit-appearance:none;transition:border-color .15s}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+input[type=color]{width:44px;padding:2px 4px;cursor:pointer}
+.btn{height:36px;padding:0 16px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface2)}.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--text);color:var(--surface);border-color:var(--text)}.btn.primary:hover{opacity:.85}
+.btn.green{border-color:var(--green);color:var(--green)}.btn.green:hover{background:var(--green-bg)}
+.btn.danger{border-color:transparent;color:var(--red)}.btn.danger:hover{background:var(--red-bg)}
+.btn.sm{height:30px;padding:0 10px;font-size:12px}
+.btn.active-mode{background:var(--text);color:var(--surface);border-color:var(--text)}
+.exp-section-label{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:1rem 0 .5rem;display:flex;align-items:center;gap:6px}
+.rec-indicator{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.exp-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:5px;background:var(--surface);transition:border-color .15s}
+.exp-item:hover{border-color:var(--border2)}.exp-item.rec{border-left:3px solid var(--green);background:var(--green-bg)}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap;font-family:'DM Mono',monospace}
+.badge.rec{background:var(--green-bg);color:var(--green)}.badge.cat{background:var(--surface2);color:var(--text2)}
+.exp-name{flex:1;font-size:13px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-person{font-size:11px;white-space:nowrap}
+.exp-amount{font-size:13px;font-weight:500;font-family:'DM Mono',monospace;min-width:80px;text-align:right;cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s}
+.exp-amount:hover{background:var(--surface2)}
+.amount-edit{width:90px;text-align:right;height:30px;font-size:13px;font-family:'DM Mono',monospace}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.05em}
+.metric-value{font-size:20px;font-weight:600;font-family:'DM Mono',monospace}
+.metric-value.green{color:var(--green)}.metric-value.blue{color:var(--blue)}.metric-value.amber{color:var(--amber)}.metric-value.red{color:var(--red)}.metric-value.purple{color:var(--purple)}
+.chart-row{margin-bottom:10px}
+.chart-lbl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:var(--text2)}
+.chart-lbl span:last-child{font-family:'DM Mono',monospace;font-size:11px}
+.chart-bg{background:var(--surface2);border-radius:4px;height:8px;overflow:hidden}
+.chart-fill{height:8px;border-radius:4px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+
+/* División */
+.div-mode-btns{display:flex;gap:6px;flex-wrap:wrap}
+.div-person-card{border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:8px}
+.div-person-head{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.div-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:var(--text2)}
+.div-row span:last-child{font-family:'DM Mono',monospace}
+.div-total{display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding-top:8px;margin-top:8px;border-top:1px solid var(--border)}
+.div-total span:last-child{font-family:'DM Mono',monospace}
+.div-balance{font-size:12px;margin-top:6px;padding:4px 10px;border-radius:20px;display:inline-block;font-family:'DM Mono',monospace;font-weight:500}
+.div-balance.pos{background:var(--green-bg);color:var(--green)}
+.div-balance.neg{background:var(--red-bg);color:var(--red)}
+.div-balance.zero{background:var(--surface2);color:var(--text3)}
+
+/* Transferencias */
+.transfers-block{margin-top:1.25rem}
+.transfers-header{font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.transfers-sub{font-size:11px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0}
+.transfer-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--blue);border-radius:var(--radius-sm);margin-bottom:6px;background:var(--blue-bg)}
+.transfer-from{font-size:13px;font-weight:600}
+.transfer-mid{font-size:12px;color:var(--text2)}
+.transfer-to{font-size:13px;font-weight:600}
+.transfer-amount{margin-left:auto;font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--blue);flex-shrink:0}
+.transfers-ok{font-size:13px;color:var(--text3);padding:.25rem 0}
+
+/* Historial */
+.hist-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem;margin-bottom:8px}
+.hist-month{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.hist-total{font-size:20px;font-weight:600;font-family:'DM Mono',monospace;margin-bottom:4px}
+.hist-delta{font-size:12px;margin-bottom:8px}
+.hist-bar-bg{background:var(--surface2);border-radius:3px;height:5px;overflow:hidden}
+.hist-bar-fill{height:5px;border-radius:3px;background:var(--blue);transition:width .4s}
+.mini-bars{display:flex;gap:3px;align-items:flex-end;height:32px;margin-top:6px}
+.mini-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.mini-bar{width:100%;border-radius:2px 2px 0 0}
+.mini-bar-lbl{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace}
+
+.export-card{border:1px solid var(--green);border-radius:var(--radius);padding:1.1rem 1.25rem;margin-bottom:1rem;background:var(--green-bg)}
+.feature-list{font-size:13px;color:var(--text2);line-height:2}
+.person-item{display:flex;align-items:center;gap:10px;padding:.7rem 1rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;background:var(--surface)}
+.empty{text-align:center;color:var(--text3);font-size:13px;padding:2rem 0}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999}
+.loading-screen.hidden{display:none}
+.loading-spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+.loading-text{font-size:13px;color:var(--text2);font-family:'DM Mono',monospace}
+@media(max-width:500px){.form-grid{grid-template-columns:1fr}.metric-grid{grid-template-columns:1fr 1fr}.main{padding:1rem}.tab{padding:7px 7px;font-size:12px}}
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loading-screen">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">conectando...</div>
+</div>
+
+<div class="header">
+  <div class="header-inner">
+    <span class="logo">GASTOS</span>
+    <div class="month-select-wrap">
+      <select id="month-sel" onchange="changeMonth()"></select>
+      <button class="btn sm" onclick="addNewMonth()">+ Mes</button>
+    </div>
+    <div class="sync-wrap">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span style="font-size:11px;color:var(--text3)" id="sync-label">...</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('gastos')">Gastos</button>
+    <button class="tab" onclick="showTab('personas')">Personas</button>
+    <button class="tab" onclick="showTab('metricas')">Métricas</button>
+    <button class="tab" onclick="showTab('division')">División</button>
+    <button class="tab" onclick="showTab('historial')">Historial</button>
+    <button class="tab" onclick="showTab('exportar')">Exportar</button>
+  </div>
+
+  <div id="tab-gastos" class="section active">
+    <div class="card">
+      <div class="card-title">Agregar gasto</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Descripción</label><input id="exp-name" placeholder="Ej: Netflix" style="width:100%"></div>
+        <div class="form-group"><label>Monto ($)</label><input id="exp-amount" type="number" placeholder="0" min="0" style="width:100%"></div>
+        <div class="form-group"><label>Categoría</label>
+          <select id="exp-cat" style="width:100%">
+            <option>Servicios</option><option>Comida</option><option>Transporte</option>
+            <option>Salud</option><option>Entretenimiento</option><option>Ropa</option><option>Otros</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Persona</label>
+          <select id="exp-person" style="width:100%"><option value="">— compartido —</option></select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="exp-recurring"> Recurrente (se copia cada mes)
+        </label>
+        <button class="btn primary" style="margin-left:auto" onclick="addExpense()">+ Agregar</button>
+      </div>
+    </div>
+    <div id="rec-list"></div>
+    <div id="reg-list"></div>
+  </div>
+
+  <div id="tab-personas" class="section">
+    <div class="card">
+      <div class="card-title">Agregar persona</div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="form-group" style="flex:1"><label>Nombre</label><input id="person-name" placeholder="Nombre" style="width:100%"></div>
+        <div class="form-group"><label>Color</label><input id="person-color" type="color" value="#1a4a8a"></div>
+        <button class="btn primary" onclick="addPerson()">+ Agregar</button>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-top:10px">Las personas se sincronizan entre todos los dispositivos.</p>
+    </div>
+    <div id="persons-list"></div>
+  </div>
+
+  <div id="tab-metricas" class="section">
+    <div class="metric-grid" id="metrics-top"></div>
+    <div class="card"><div class="card-title">Por categoría</div><div id="cat-chart"></div></div>
+    <div class="card"><div class="card-title">Por persona</div><div id="person-chart"></div></div>
+  </div>
+
+  <div id="tab-division" class="section">
+    <div class="card">
+      <div class="card-title">Modo de división</div>
+      <div class="div-mode-btns">
+        <button class="btn active-mode" id="div-equal" onclick="setDivMode('equal')">Partes iguales</button>
+        <button class="btn" id="div-personal" onclick="setDivMode('personal')">Solo personales</button>
+        <button class="btn" id="div-mixed" onclick="setDivMode('mixed')">Compartido + personales</button>
+      </div>
+    </div>
+    <div id="division-result"></div>
+    <div id="transfers-result"></div>
+  </div>
+
+  <div id="tab-historial" class="section">
+    <div class="card"><div class="card-title">Comparativa de meses</div><div id="compare-months"></div></div>
+    <div class="card"><div class="card-title">Evolución por categoría</div><div id="hist-cats"></div></div>
+  </div>
+
+  <div id="tab-exportar" class="section">
+    <div class="export-card">
+      <div class="card-title" style="color:var(--green)">Exportar a Excel</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.7">Descargá un archivo .xlsx con los datos del mes actual o de todos los meses.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn green" onclick="exportExcel('mes')">↓ Mes actual</button>
+        <button class="btn green" onclick="exportExcel('todo')">↓ Todos los meses</button>
+      </div>
+      <div id="export-status" style="font-size:12px;color:var(--green)"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">¿Qué incluye?</div>
+      <div class="feature-list">
+        ✔ Hoja <strong>Gastos</strong> — listado completo con categoría y persona<br>
+        ✔ Hoja <strong>Resumen</strong> — totales por categoría con fórmulas<br>
+        ✔ Hoja <strong>División</strong> — balances y transferencias necesarias<br>
+        ✔ Hoja <strong>Historial</strong> — comparativa de todos los meses
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBlvgdOq_kVryRE4NqEUJhFKAgwxcYTWs4",
+  authDomain: "mis-gastos-9652b.firebaseapp.com",
+  projectId: "mis-gastos-9652b",
+  storageBucket: "mis-gastos-9652b.firebasestorage.app",
+  messagingSenderId: "78936337084",
+  appId: "1:78936337084:web:16655f3e377a51e614beb9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CAT_COLORS = { Servicios:'#1a4a8a', Comida:'#2d6a4f', Transporte:'#7a4a00', Salud:'#8a1a1a', Entretenimiento:'#4a1a8a', Ropa:'#7a1a5a', Otros:'#4a4a4a' };
+const CAT_LIST   = ['Servicios','Comida','Transporte','Salud','Entretenimiento','Ropa','Otros'];
+
+let persons = [], months = {}, currentMonthKey = '';
+let divMode = 'equal', editingId = null, currentTab = 'gastos';
+let currentMonthUnsub = null;
+
+const $id = id => document.getElementById(id);
+function todayKey(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function keyToLabel(k){ const[y,m]=k.split('-'); return `${MONTHS_ES[parseInt(m)-1]} ${y}`; }
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function setSyncStatus(s,m){ $id('sync-dot').className='sync-dot '+s; $id('sync-label').textContent=m; }
+function currentExpenses(){ return months[currentMonthKey]?.expenses||[]; }
+
+// ── FIREBASE WRITES ───────────────────────────────────────────────────────────
+async function savePersons(){
+  setSyncStatus('saving','guardando...');
+  await setDoc(doc(db,'data','persons'),{list:persons});
+}
+async function saveMonthIndex(){
+  await setDoc(doc(db,'data','months'),{list:Object.keys(months)});
+}
+async function saveMonthExpenses(key){
+  setSyncStatus('saving','guardando...');
+  await setDoc(doc(db,'months',key),{expenses:months[key]?.expenses||[]});
+}
+
+// ── FIREBASE LISTENERS ────────────────────────────────────────────────────────
+function subscribeToMonth(key){
+  if(currentMonthUnsub){ currentMonthUnsub(); currentMonthUnsub=null; }
+  currentMonthUnsub = onSnapshot(doc(db,'months',key), snap=>{
+    if(!months[key]) months[key]={};
+    months[key].expenses = snap.exists()?(snap.data().expenses||[]):[];
+    renderExpenses();
+    if(currentTab==='metricas') renderMetrics();
+    if(currentTab==='division') renderDivision();
+    setSyncStatus('ok','sync ●');
+  }, ()=>setSyncStatus('err','error'));
+}
+
+function startListeners(){
+  onSnapshot(doc(db,'data','persons'), snap=>{
+    persons = snap.exists()?(snap.data().list||[]):[];
+    updatePersonSelect(); renderPersons();
+    if(currentTab==='division') renderDivision();
+    if(currentTab==='metricas') renderMetrics();
+    setSyncStatus('ok','sync ●');
+  }, ()=>setSyncStatus('err','error'));
+
+  onSnapshot(doc(db,'data','months'), snap=>{
+    const list = snap.exists()?(snap.data().list||[]):[];
+    list.forEach(k=>{ if(!months[k]) months[k]={expenses:[]}; });
+    renderMonthSelect();
+    setSyncStatus('ok','sync ●');
+  }, ()=>setSyncStatus('err','error'));
+
+  subscribeToMonth(currentMonthKey);
+}
+
+async function init(){
+  setSyncStatus('saving','conectando...');
+  const k = todayKey();
+  const snap = await getDoc(doc(db,'months',k));
+  months[k] = { expenses: snap.exists()?(snap.data().expenses||[]):[] };
+  if(!snap.exists()){ await saveMonthIndex(); await saveMonthExpenses(k); }
+  currentMonthKey = k;
+  $id('loading-screen').classList.add('hidden');
+  startListeners();
+}
+init().catch(()=>{ $id('loading-screen').classList.add('hidden'); setSyncStatus('err','sin conexión'); });
+
+// ── MONTHS ────────────────────────────────────────────────────────────────────
+function renderMonthSelect(){
+  const sel=$id('month-sel'), keys=Object.keys(months).sort().reverse();
+  sel.innerHTML=keys.map(k=>`<option value="${k}" ${k===currentMonthKey?'selected':''}>${keyToLabel(k)}</option>`).join('');
+}
+window.changeMonth=function(){ currentMonthKey=$id('month-sel').value; subscribeToMonth(currentMonthKey); };
+window.addNewMonth=async function(){
+  const now=new Date(); let y=now.getFullYear(),m=now.getMonth()+1;
+  while(months[`${y}-${String(m).padStart(2,'0')}`]){ m--; if(m<1){m=12;y--;} }
+  const k=`${y}-${String(m).padStart(2,'0')}`;
+  const latest=Object.keys(months).sort().reverse()[0];
+  const recs=latest?(months[latest]?.expenses||[]).filter(e=>e.recurring).map(e=>({...e,id:genId()})):[];
+  months[k]={expenses:recs};
+  currentMonthKey=k;
+  await saveMonthIndex(); await saveMonthExpenses(k);
+  renderMonthSelect(); subscribeToMonth(k);
+};
+
+// ── PERSONS ───────────────────────────────────────────────────────────────────
+function updatePersonSelect(){
+  $id('exp-person').innerHTML='<option value="">— compartido —</option>'+persons.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+window.addPerson=async function(){
+  const name=$id('person-name').value.trim(); if(!name) return;
+  persons.push({id:genId(),name,color:$id('person-color').value});
+  $id('person-name').value=''; await savePersons();
+};
+window.removePerson=async function(id){ persons=persons.filter(p=>p.id!==id); await savePersons(); };
+function renderPersons(){
+  $id('persons-list').innerHTML=persons.map(p=>`
+    <div class="person-item">
+      <div style="width:12px;height:12px;border-radius:50%;background:${p.color};flex-shrink:0"></div>
+      <span style="flex:1;font-weight:500">${p.name}</span>
+      <button class="btn sm danger" onclick="removePerson('${p.id}')">Eliminar</button>
+    </div>`).join('')||'<div class="empty">Sin personas</div>';
+}
+
+// ── EXPENSES ──────────────────────────────────────────────────────────────────
+window.addExpense=async function(){
+  const name=$id('exp-name').value.trim(), amount=parseFloat($id('exp-amount').value);
+  if(!name||isNaN(amount)||amount<=0) return;
+  const personId=$id('exp-person').value||null, person=personId?persons.find(p=>p.id===personId):null;
+  const exp={id:genId(),name,amount,cat:$id('exp-cat').value,personId,personName:person?.name||null,personColor:person?.color||null,recurring:$id('exp-recurring').checked};
+  if(!months[currentMonthKey]) months[currentMonthKey]={expenses:[]};
+  months[currentMonthKey].expenses.push(exp);
+  $id('exp-name').value=''; $id('exp-amount').value=''; $id('exp-recurring').checked=false;
+  await saveMonthExpenses(currentMonthKey);
+};
+window.removeExpense=async function(id){
+  months[currentMonthKey].expenses=months[currentMonthKey].expenses.filter(e=>e.id!==id);
+  await saveMonthExpenses(currentMonthKey);
+};
+window.startEdit=function(id){ editingId=id; renderExpenses(); };
+window.saveEdit=async function(id){
+  const v=parseFloat($id('edit-'+id)?.value);
+  if(!isNaN(v)&&v>0){ months[currentMonthKey].expenses=months[currentMonthKey].expenses.map(e=>e.id===id?{...e,amount:v}:e); await saveMonthExpenses(currentMonthKey); }
+  editingId=null; renderExpenses();
+};
+
+function renderExpItem(e){
+  const amEl=editingId===e.id
+    ?`<input id="edit-${e.id}" class="amount-edit" type="number" value="${e.amount}" onblur="saveEdit('${e.id}')" onkeydown="if(event.key==='Enter')saveEdit('${e.id}')">`
+    :`<span class="exp-amount" onclick="startEdit('${e.id}')" title="Clic para editar">$${e.amount.toLocaleString('es-AR')}</span>`;
+  const perEl=e.personName
+    ?`<span class="exp-person" style="color:${e.personColor};font-weight:500">${e.personName}</span>`
+    :`<span class="exp-person" style="color:var(--text3)">compartido</span>`;
+  return `<div class="exp-item ${e.recurring?'rec':''}">
+    ${e.recurring?`<span class="badge rec">↺</span>`:''}
+    <span class="exp-name">${e.name}</span>
+    <span class="badge cat">${e.cat}</span>
+    ${perEl}${amEl}
+    <button class="btn sm danger" onclick="removeExpense('${e.id}')">✕</button>
+  </div>`;
+}
+function renderExpenses(){
+  const exps=currentExpenses(), rec=exps.filter(e=>e.recurring), reg=exps.filter(e=>!e.recurring);
+  $id('rec-list').innerHTML=`<div class="exp-section-label"><span class="rec-indicator"></span>Recurrentes</div>`+(rec.length?rec.map(renderExpItem).join(''):'<div class="empty">Sin gastos recurrentes</div>');
+  $id('reg-list').innerHTML=`<div class="exp-section-label">Gastos del mes</div>`+(reg.length?reg.map(renderExpItem).join(''):'<div class="empty">Agregá el primer gasto del mes</div>');
+  if(editingId) setTimeout(()=>{ const el=$id('edit-'+editingId); if(el){el.focus();el.select();} },40);
+}
+
+// ── MÉTRICAS ──────────────────────────────────────────────────────────────────
+function renderMetrics(){
+  const exps=currentExpenses(), total=exps.reduce((s,e)=>s+e.amount,0), rec=exps.filter(e=>e.recurring).reduce((s,e)=>s+e.amount,0);
+  const cats={}; exps.forEach(e=>{ cats[e.cat]=(cats[e.cat]||0)+e.amount; });
+  $id('metrics-top').innerHTML=`
+    <div class="metric"><div class="metric-label">Total mes</div><div class="metric-value">$${total.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Recurrentes</div><div class="metric-value green">$${rec.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Servicios</div><div class="metric-value blue">$${(cats['Servicios']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Comida</div><div class="metric-value amber">$${(cats['Comida']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Transporte</div><div class="metric-value red">$${(cats['Transporte']||0).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Entretenimiento</div><div class="metric-value purple">$${(cats['Entretenimiento']||0).toLocaleString('es-AR')}</div></div>`;
+  if(!total){ $id('cat-chart').innerHTML='<div class="empty">Sin datos</div>'; $id('person-chart').innerHTML='<div class="empty">Sin datos</div>'; return; }
+  $id('cat-chart').innerHTML=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>`
+    <div class="chart-row">
+      <div class="chart-lbl"><span>${cat}</span><span>$${val.toLocaleString('es-AR')} · ${Math.round(val/total*100)}%</span></div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(val/total*100)}%;background:${CAT_COLORS[cat]||'#888'}"></div></div>
+    </div>`).join('');
+  const byP={}; exps.forEach(e=>{ const k=e.personName||'Compartido'; byP[k]={total:(byP[k]?.total||0)+e.amount,color:e.personColor||'#888'}; });
+  $id('person-chart').innerHTML=Object.entries(byP).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>`
+    <div class="chart-row">
+      <div class="chart-lbl"><span>${name}</span><span>$${d.total.toLocaleString('es-AR')} · ${Math.round(d.total/total*100)}%</span></div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${Math.round(d.total/total*100)}%;background:${d.color}"></div></div>
+    </div>`).join('');
+}
+
+// ── DIVISIÓN + TRANSFERENCIAS ─────────────────────────────────────────────────
+/*
+  Algoritmo de transferencias mínimas (greedy):
+  - balance[i] = lo que pagó - lo que le corresponde pagar
+  - balance > 0 → le deben plata   (acreedor)
+  - balance < 0 → debe plata        (deudor)
+  Iteramos: el mayor deudor le transfiere al mayor acreedor hasta saldar.
+*/
+function calcTransfers(balances){
+  const creds = balances.filter(b=>b.balance> 0.5).map(b=>({...b})).sort((a,b)=>b.balance-a.balance);
+  const debts  = balances.filter(b=>b.balance<-0.5).map(b=>({...b})).sort((a,b)=>a.balance-b.balance);
+  const result = [];
+  let ci=0, di=0;
+  while(ci<creds.length && di<debts.length){
+    const amt = Math.min(creds[ci].balance, -debts[di].balance);
+    if(amt>0.5) result.push({from:debts[di].name, fromColor:debts[di].color, to:creds[ci].name, toColor:creds[ci].color, amount:Math.round(amt)});
+    creds[ci].balance -= amt; debts[di].balance += amt;
+    if(creds[ci].balance<0.5) ci++;
+    if(-debts[di].balance<0.5) di++;
+  }
+  return result;
+}
+
+function calcDivision(exps, mode){
+  const grandTotal   = exps.reduce((s,e)=>s+e.amount,0);
+  const sharedTotal  = exps.filter(e=>!e.personId).reduce((s,e)=>s+e.amount,0);
+  const n = persons.length||1;
+  return persons.map(p=>{
+    const paid = exps.filter(e=>e.personId===p.id).reduce((s,e)=>s+e.amount,0);
+    const shareEach = sharedTotal/n;
+    const target = mode==='equal' ? grandTotal/n
+                 : mode==='personal' ? paid
+                 : paid + shareEach;
+    return { name:p.name, color:p.color, paid, target, shareEach, balance: paid-target };
+  });
+}
+
+function renderDivision(){
+  const exps=currentExpenses();
+  const divEl=$id('division-result'), trEl=$id('transfers-result');
+  if(!persons.length){ divEl.innerHTML='<div class="empty">Agregá personas primero</div>'; trEl.innerHTML=''; return; }
+  if(!exps.length){    divEl.innerHTML='<div class="empty">Sin gastos este mes</div>';       trEl.innerHTML=''; return; }
+
+  const divs=calcDivision(exps,divMode);
+  const grandTotal=exps.reduce((s,e)=>s+e.amount,0), n=persons.length;
+
+  divEl.innerHTML=divs.map(d=>{
+    const target=Math.round(d.target), paid=Math.round(d.paid), bal=Math.round(d.balance);
+    const balClass=bal>0?'pos':bal<0?'neg':'zero';
+    const balText=bal>0?`Le deben $${Math.abs(bal).toLocaleString('es-AR')}`:bal<0?`Debe $${Math.abs(bal).toLocaleString('es-AR')}`:'Está al día ✔';
+    let rows='';
+    if(divMode==='equal'){
+      rows=`<div class="div-row"><span>Total del mes</span><span>$${grandTotal.toLocaleString('es-AR')}</span></div>
+            <div class="div-row"><span>Le corresponde (1/${n})</span><span>$${target.toLocaleString('es-AR')}</span></div>
+            <div class="div-row"><span>Ya pagó / cargó</span><span>$${paid.toLocaleString('es-AR')}</span></div>`;
+    } else if(divMode==='personal'){
+      rows=`<div class="div-row"><span>Gastos propios</span><span>$${paid.toLocaleString('es-AR')}</span></div>`;
+    } else {
+      rows=`<div class="div-row"><span>Gastos propios</span><span>$${paid.toLocaleString('es-AR')}</span></div>
+            <div class="div-row"><span>Parte compartida (1/${n})</span><span>$${Math.round(d.shareEach).toLocaleString('es-AR')}</span></div>
+            <div class="div-row"><span>Ya pagó / cargó</span><span>$${paid.toLocaleString('es-AR')}</span></div>`;
+    }
+    return `<div class="div-person-card">
+      <div class="div-person-head"><span style="width:11px;height:11px;border-radius:50%;background:${d.color};display:inline-block;flex-shrink:0"></span>${d.name}</div>
+      ${rows}
+      <div class="div-total"><span>Debe pagar en total</span><span>$${target.toLocaleString('es-AR')}</span></div>
+      <span class="div-balance ${balClass}">${balText}</span>
+    </div>`;
+  }).join('');
+
+  // Transferencias solo si hay más de un participante y no es modo personal
+  if(divMode==='personal'||persons.length<2){ trEl.innerHTML=''; return; }
+
+  const transfers=calcTransfers(divs.map(d=>({name:d.name,color:d.color,balance:d.balance})));
+
+  trEl.innerHTML=`<div class="transfers-block">
+    <div class="transfers-header">Transferencias para quedar iguales <span class="transfers-sub">mínimas necesarias</span></div>
+    ${transfers.length
+      ? transfers.map(t=>`<div class="transfer-item">
+          <span class="transfer-from" style="color:${t.fromColor}">${t.from}</span>
+          <span class="transfer-mid">→ le transfiere a →</span>
+          <span class="transfer-to" style="color:${t.toColor}">${t.to}</span>
+          <span class="transfer-amount">$${t.amount.toLocaleString('es-AR')}</span>
+        </div>`).join('')
+      : '<div class="transfers-ok">✔ Todos están al día, no hace falta ninguna transferencia.</div>'
+    }
+  </div>`;
+}
+
+window.setDivMode=function(m){
+  divMode=m;
+  ['equal','personal','mixed'].forEach(x=>$id('div-'+x).classList.toggle('active-mode',x===m));
+  renderDivision();
+};
+
+// ── HISTORIAL ─────────────────────────────────────────────────────────────────
+async function renderHistorial(){
+  const keys=Object.keys(months).sort().reverse();
+  const compareEl=$id('compare-months');
+  if(!keys.length){ compareEl.innerHTML='<div class="empty">Sin historial aún</div>'; return; }
+  for(const k of keys){
+    if(!months[k]?.expenses?.length){
+      const snap=await getDoc(doc(db,'months',k));
+      if(snap.exists()) months[k]={expenses:snap.data().expenses||[]};
+    }
+  }
+  const totals=keys.map(k=>({k,label:keyToLabel(k),total:(months[k]?.expenses||[]).reduce((s,e)=>s+e.amount,0)}));
+  const max=Math.max(...totals.map(t=>t.total),1);
+  compareEl.innerHTML=totals.map((t,i)=>{
+    const prev=totals[i+1]; let delta='';
+    if(prev&&prev.total>0){ const pct=Math.round((t.total-prev.total)/prev.total*100); delta=`<div class="hist-delta" style="color:${pct>0?'var(--red)':'var(--green)'}">${pct>0?'▲':'▼'} ${Math.abs(pct)}% vs mes anterior</div>`; }
+    return `<div class="hist-card">
+      <div class="hist-month">${t.label}</div>
+      <div class="hist-total">$${t.total.toLocaleString('es-AR')}</div>
+      ${delta}
+      <div class="hist-bar-bg"><div class="hist-bar-fill" style="width:${Math.round(t.total/max*100)}%"></div></div>
+    </div>`;
+  }).join('');
+  const histEl=$id('hist-cats');
+  const catData={};
+  CAT_LIST.forEach(c=>{ catData[c]=keys.slice(0,6).reverse().map(k=>({label:keyToLabel(k).slice(0,3),val:(months[k]?.expenses||[]).filter(e=>e.cat===c).reduce((s,e)=>s+e.amount,0)})); });
+  const catMax=Math.max(...Object.values(catData).flat().map(d=>d.val),1);
+  histEl.innerHTML=CAT_LIST.filter(c=>catData[c].some(d=>d.val>0)).map(c=>`
+    <div class="chart-row" style="margin-bottom:14px">
+      <div class="chart-lbl" style="margin-bottom:6px"><span style="font-weight:500">${c}</span></div>
+      <div class="mini-bars">${catData[c].map(d=>`
+        <div class="mini-bar-wrap">
+          <div class="mini-bar" style="background:${CAT_COLORS[c]};height:${Math.round(d.val/catMax*28)}px;min-height:${d.val>0?2:0}px"></div>
+          <span class="mini-bar-lbl">${d.label}</span>
+        </div>`).join('')}
+      </div>
+    </div>`).join('')||'<div class="empty">Sin datos suficientes</div>';
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+window.showTab=function(t){
+  currentTab=t;
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['gastos','personas','metricas','division','historial','exportar'][i]===t));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  $id('tab-'+t).classList.add('active');
+  if(t==='metricas') renderMetrics();
+  if(t==='division') renderDivision();
+  if(t==='historial') renderHistorial();
+  if(t==='personas') renderPersons();
+};
+
+// ── EXCEL ─────────────────────────────────────────────────────────────────────
+function buildWorkbook(monthKeys){
+  const wb=XLSX.utils.book_new();
+  monthKeys.forEach(mk=>{
+    const label=keyToLabel(mk), exps=months[mk]?.expenses||[];
+    const total=exps.reduce((s,e)=>s+e.amount,0), cats={};
+    exps.forEach(e=>{ cats[e.cat]=(cats[e.cat]||0)+e.amount; });
+    const wsG=XLSX.utils.aoa_to_sheet([
+      ['Descripción','Categoría','Persona','Monto ($)','Tipo'],
+      ...exps.map(e=>[e.name,e.cat,e.personName||'Compartido',e.amount,e.recurring?'Recurrente':'Variable']),
+      [],['TOTAL','','',`=SUM(D2:D${exps.length+1})`,'']
+    ]);
+    wsG['!cols']=[{wch:28},{wch:16},{wch:16},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsG,`Gastos ${label}`.slice(0,31));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+      ['Categoría','Monto ($)','% del total'],
+      ...CAT_LIST.filter(c=>cats[c]).map(c=>[c,cats[c],total>0?Math.round(cats[c]/total*100)+'%':'0%']),
+      [],['TOTAL',total,'100%']
+    ]),`Resumen ${label}`.slice(0,31));
+    const divs=calcDivision(exps,divMode);
+    const transfers=calcTransfers(divs.map(d=>({name:d.name,color:d.color,balance:d.balance})));
+    const wsD=XLSX.utils.aoa_to_sheet([
+      ['Persona','Pagó ($)','Debe pagar ($)','Balance ($)'],
+      ...divs.map(d=>[d.name,Math.round(d.paid),Math.round(d.target),Math.round(d.balance)]),
+      [],[],['Transferencias necesarias'],
+      ...(transfers.length?transfers.map(t=>[`${t.from} → ${t.to}`,'','',t.amount]):[['Sin transferencias necesarias','','','']])
+    ]);
+    wsD['!cols']=[{wch:22},{wch:14},{wch:16},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsD,`División ${label}`.slice(0,31));
+  });
+  if(monthKeys.length>1){
+    const histRows=[['Mes','Total ($)',...CAT_LIST]];
+    monthKeys.slice().reverse().forEach(mk=>{
+      const exps=months[mk]?.expenses||[], cats={};
+      exps.forEach(e=>{ cats[e.cat]=(cats[e.cat]||0)+e.amount; });
+      histRows.push([keyToLabel(mk),exps.reduce((s,e)=>s+e.amount,0),...CAT_LIST.map(c=>cats[c]||0)]);
+    });
+    const wsH=XLSX.utils.aoa_to_sheet(histRows);
+    wsH['!cols']=[{wch:18},{wch:14},...CAT_LIST.map(()=>({wch:14}))];
+    XLSX.utils.book_append_sheet(wb,wsH,'Historial');
+  }
+  return wb;
+}
+window.exportExcel=function(mode){
+  const keys=Object.keys(months).sort().reverse();
+  if(!keys.length){ $id('export-status').textContent='Sin datos.'; return; }
+  $id('export-status').textContent='Generando...';
+  setTimeout(()=>{
+    try{
+      const wb=buildWorkbook(mode==='mes'?[currentMonthKey]:keys);
+      XLSX.writeFile(wb,`Gastos ${mode==='mes'?keyToLabel(currentMonthKey):'Completo'}.xlsx`);
+      $id('export-status').textContent='✔ Descargado correctamente';
+    }catch(e){ $id('export-status').textContent='Error al generar el archivo.'; }
+  },100);
+};
+
+renderExpenses();
+setDivMode('equal');
+</script>
+</body>
+</html>
